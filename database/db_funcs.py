@@ -90,14 +90,24 @@ def link_checking(link_code):
     return False
 
 
-# def fetch_link_data(link_code):
-#     conn = sqlite3.connect(db_name)
-#     cursor = conn.cursor()
-#     cursor.execute("SELECT UserID FROM Auth_links WHERE LinkCode=?", (link_code,))
-#     row = cursor.fetchone()
-#     if row:
-#         cursor.execute("DELETE FROM Auth_links WHERE UserID = ?", row)
-#         conn.commit()
-#     cursor.close()
-#     conn.close()
+def fetch_link_data(link_code, tg: int):
+    conn = sqlite3.connect(db_name)
+    cursor = conn.cursor()
+    cursor.execute("SELECT UserID FROM Auth_links WHERE LinkCode = ?", (link_code,))
+    row = cursor.fetchone()
+    if row:
+        cursor.execute("DELETE FROM Auth_links WHERE UserID = ?", (row[0], ))
+        cursor.execute("UPDATE Users SET TelegramID = ? WHERE UserID = ?", (tg, row[0], ))
+        conn.commit()
+    cursor.close()
+    conn.close()
+
+
+def check_user(user_id):
+    conn = sqlite3.connect(db_name)
+    cursor = conn.cursor()
+    cursor.execute("SELECT Name FROM Users WHERE TelegramID = ?", (user_id, ))
+    row = cursor.fetchone()
+    conn.close()
+    return row[0] if row else False
 

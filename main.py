@@ -3,7 +3,8 @@ from aiogram.dispatcher.filters import Command
 from aiogram.dispatcher import FSMContext
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher.filters.state import State, StatesGroup
-from database.db_funcs import add_user, list_of_users, process_delete_user_db, complete_deletion, add_link_code, link_checking
+from database.db_funcs import add_user, list_of_users, fetch_link_data, process_delete_user_db, complete_deletion,\
+    add_link_code, link_checking, check_user
 from database.init_db import init_db
 import config
 import uuid
@@ -30,20 +31,35 @@ def code_generation():
 @dp.message_handler(Command("start"))
 async def start(message: types.Message):
     user_id = message.from_user.id
+    name = check_user(user_id)
+
+    if len(message.text.split()) > 1:
+        code_link = message.get_args()
+        flag = link_checking(code_link)
+        if name:
+            text = f"Вы уже авторизованы как {name}"
+        elif flag:
+            try:
+                print(code_link)
+                fetch_link_data(str(code_link), int(user_id))
+                text = "Вы перешли по ссылке, добро пожаловать"
+            except Exception as err:
+                print(err)
+                await message.reply("Некорректная ссылка")
+        else:
+            text = "Ссылка уже использована другим пользователем"
+    elif check_user(message.from_user.id):
+        text = f"Добро пожаловать, {name}"
+    else:
+        text = "У вас нет доступа к боту, запросите ссылку"
     if is_admin(user_id):
         keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
         keyboard.add('Пользователи')
-        await message.answer("Добро пожаловать!", reply_markup=keyboard)
+        if text == "У вас нет доступа к боту, запросите ссылку":
+            text = "Добро пожаловать, Администратор"
+        await message.answer(text, reply_markup=keyboard)
     else:
-        code_link = message.get_args()
-        flag = link_checking(code_link)
-        if flag:
-            try:
-                await message.reply(f"Вы перешли по ссылке, добро пожаловать")
-            except Exception as err:
-                await message.reply("Некорректная ссылка")
-        else:
-            await message.reply("У вас нет доступа к боту, запросите ссылку")
+        await message.answer(text)
 
 
 @dp.message_handler(lambda message: message.text == 'Пользователи')
@@ -77,7 +93,8 @@ async def on_name_input(message: types.Message, state: FSMContext):
         ind_code = code_generation()
         add_link_code(id, ind_code)
         await message.answer('Сcылка для студента:')
-        await message.answer(f"https://t.me/{config.bot_username}?start={ind_code}")
+        bot_info = await bot.get_me()
+        await message.answer(f"https://t.me/{bot_info.username}?start={ind_code}")
         await state.finish()
     else:
         await message.answer("При добавлении пользователя произошла ошибка")
